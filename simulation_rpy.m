@@ -11,9 +11,9 @@ clear;
 
         quad_radius = .25; % Radius of quadrotor [m]
 
-        I_p = 1; % Rotational moments of inertia [kg*m^2]
-        I_r = 1;
-        I_y = 1;
+        I_p = 0.025; % Rotational moments of inertia [kg*m^2]
+        I_r = 0.025;
+        I_y = 0.049;
 
         b_p = 0.5*is_drag; % Aero drag factors [N*s^2/m^2]
         b_r = 0.5*is_drag;
@@ -216,9 +216,9 @@ end %while
 function commands = controller(current)
 
     % PID Parameter Setup
-    kp = 5*[4 4 1];
-    ki = 1.25*[4 4 1];
-    kd = 5*[4 4 1];
+    kp = 1/8*[4 4 1];
+    ki = 1/32*[4 4 1];
+    kd = 1/8*[4 4 1];
 
     % Error Calculation
     error = target - current(1,:);
