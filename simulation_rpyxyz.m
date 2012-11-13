@@ -1,5 +1,7 @@
- function SYSTEM
+ function simulation_rpyxyz
 clear;
+
+% This sim is still somewhat experimental and non-functional, be warned...
 
 % ===== Physical Properties ==========
 
