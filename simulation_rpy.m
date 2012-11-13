@@ -19,9 +19,7 @@ clear;
         b_r = 0.5*is_drag;
         b_y = 0.5*is_drag;
 
-        cmd2thrust = @(cmds) cmds; % Function mapping 8-bit ESC input to generated motor thrusts [N]
-
-        cmd2torque = @(cmds) cmds; % Function mapping 8-bit ESC input to generated motor torque [N*m]  
+        thrust2torque = @(cmds) cmds; % Function mapping 8-bit ESC input to generated motor torque [N*m]  
         
 
 % ===== Simulation Setup ==========
@@ -43,11 +41,11 @@ clear;
         t_start = tic; % Starts simulation clock
         t = toc(t_start);
         
-        thrusts = zeros(4,1); % Define initial thrusts and torques
-        torques = zeros(3,1);
+        thrusts_prev = zeros(4,1); % Define initial thrusts and torques
+        torques_prev = zeros(3,1);
 
         ICs = [ % Define initial kinematic conditions
-            pi/4 pi/2 pi/6; % pry xyz position
+            0 0 pi/4; % pry xyz position
             0 0 0; % pry xyz velocity
             0 0 0
             ];
@@ -200,10 +198,10 @@ while (ishandle(fig1))
     t = toc(t_start); 
     dt = t-t_prev;
     
-    commands = controller(current);
+    thrusts = controller(current);
     %commands = commands + signal_noise; % signal_noise could be added here
     
-    current = plant(commands,current);
+    current = plant(thrusts,current);
     %current = current + sensor_noise;  % sensor_noise could be added here
     
     updateplots(current);
@@ -213,7 +211,7 @@ end %while
 
 % ===== Subsystems ==========
 
-function commands = controller(current)
+function thrusts = controller(current)
 
     % PID Parameter Setup
     kp = 1/8*[4 4 1];
@@ -228,48 +226,41 @@ function commands = controller(current)
     % PID Control
     corrections = kp.*error + ki.*int_error + kd.*d_error;
 
-    % Generate motor commands from PID corrections
-    commands = corr2command(corrections);
+    % Generate motor thrusts from PID corrections
+    nose_thrust = 0.5*corrections(1) + 0.25*corrections(3);
+    nose_angle = 0;
 
-    function out = corr2command(corrections)
-        nose_thrust = 0.5*corrections(1) + 0.25*corrections(3);
-        nose_angle = 0;
+    tail_thrust = -0.5*corrections(1) + 0.25*corrections(3);
+    tail_angle = 0;
 
-        tail_thrust = -0.5*corrections(1) + 0.25*corrections(3);
-        tail_angle = 0;
+    right_thrust = -0.5*corrections(2) - 0.25*corrections(3);
+    right_angle = 0;
 
-        right_thrust = -0.5*corrections(2) - 0.25*corrections(3);
-        right_angle = 0;
+    left_thrust = 0.5*corrections(2) - 0.25*corrections(3);
+    left_angle = 0;
 
-        left_thrust = 0.5*corrections(2) - 0.25*corrections(3);
-        left_angle = 0;
-
-        out = [
-            nose_thrust nose_angle;
-            tail_thrust tail_angle;
-            right_thrust right_angle;
-            left_thrust left_angle
-            ];
-
-    end %function corr2command
-    
+    % Package thrusts
+    thrusts = [
+        nose_thrust nose_angle;
+        tail_thrust tail_angle;
+        right_thrust right_angle;
+        left_thrust left_angle
+    ];
+        
 end
 
-function current = plant(commands, prev)
+function current = plant(thrusts, prev)
 
     %Unpack previous physical data
     theta_prev = prev(1,1:3);
     theta_dot_prev = prev(2,1:3);
     theta_dotdot_prev = prev(3,1:3);
       
-    torques_prev = torques;
-    torques(3) = cmd2torque(commands(1,1))*cos(commands(1,2)) + cmd2torque(commands(2,1))*cos(commands(2,2)) - cmd2torque(commands(3,1))*cos(commands(3,2)) - cmd2torque(commands(4,1))*cos(commands(4,2)); % Determine net system torques resulting from commands
+    torques(3) = thrust2torque(thrusts(1,1)) + thrust2torque(thrusts(2,1)) - thrust2torque(thrusts(3,1)) - thrust2torque(thrusts(4,1)); % Determine net system torques resulting from commands
     T_p_dot = (torques(1) - torques_prev(1))/dt;
     T_r_dot = (torques(2) - torques_prev(2))/dt;
     T_y_dot = (torques(3) - torques_prev(3))/dt;
     
-    thrusts_prev = thrusts;
-    thrusts = cmd2thrust(commands); % Determine motor thrusts generated from commands
     thr_nose_dot = (thrusts(1) - thrusts_prev(1))/dt;
     thr_tail_dot = (thrusts(2) - thrusts_prev(2))/dt;
     thr_right_dot = (thrusts(3) - thrusts_prev(3))/dt;
@@ -280,13 +271,16 @@ function current = plant(commands, prev)
     theta_dotdot(3) = theta_dotdot_prev(3) + T_y_dot/I_y*dt - (b_y*theta_dot_prev(3)^2*sign(theta_dot_prev(3)))/I_y;
     
     theta_dot = theta_dot_prev + theta_dotdot*dt;
-    theta = theta_prev + theta_dot*dt + 0.5*theta_dotdot*dt^2;    
+    theta = theta_prev + theta_dot*dt + 0.5*theta_dotdot*dt^2;   
 
     current = [ % Repack current data
         theta;
         theta_dot;
         theta_dotdot;
         ];
+    
+    torques_prev = torques;
+    thrusts_prev = thrusts;
 
 end
 
