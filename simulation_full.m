@@ -5,19 +5,19 @@ clear;
 
     %  === World Properties ======
 
-        g = 9.81; % Field strength;
+        g = 9.81; % Field strength [N/kg];
         %is_drag = 0; % Enable or disable air resistance
         is_grav = 1; % Enable or disable gravity
 
     %  === Copter Properties ======
 
         quad_radius = 1; % Radius of quadrotor [m]
-        quad_mass = 1.3; % Mass of quadrotor [kg]
+        quad_mass = 1.125; % Mass of quadrotor [kg]
 
         quad_I = [ % Inertia tensor [kg*m^2]
-            0.025, 0, 0; 
-            0, 0.025, 0;
-            0, 0, 0.049;
+            0.0234548, 0, 0; 
+            0, 0.0241389, 0;
+            0, 0, 0.0467296;
             ];
         
         motor_pos = [
@@ -30,8 +30,9 @@ clear;
         %b_p = 0.5*is_drag; % Aero drag factors [N*s^2/m^2]
         %b_r = 0.5*is_drag;
         %b_y = 0.5*is_drag;
-
-        thrust2torque = @(cmds) [1 0 0 0; 2/3 0 0 1/3; -1/3 0 0 -2/3; 0 0 0 -1]*cmds; % Function mapping motor thrust to torque generated [N*m]  
+        
+        max_thrust = 1*g; %[N]
+        thrust2torque = @(cmds) [cmds(1,:);cmds(2,:);-cmds(3,:);-cmds(4,:)]; %[1 0 0 0; 2/3 0 0 1/3; -1/3 0 0 -2/3; 0 0 0 -1]*cmds; % Function mapping motor thrust to torque generated [N*m]  
         
 
 % ===== Simulation Setup ==========
@@ -40,7 +41,7 @@ clear;
        
     %  === Static Target Setup ======
 
-        target = [0 0 0 5 5 1]; % Define target positions (rpy xyz)
+        target = [0 0 0 5 5 2]; % Define target positions (rpy xyz)
             
         dcm_target = angle2dcm(target(1),target(2),target(3),'XYZ'); % Calculate target position representation
         right_target = dcm_target*[-quad_radius;0;0] + target(4:6)'; % Rotate target quadrotor points with target DCM
@@ -70,7 +71,7 @@ clear;
         fig1 = figure(1);
         
         subplot(6,2,[1 3 5 7 9 11]);
-        axis(10*[-1 1 -1 1 0 2]);
+        axis(7*[-1 1 -1 1 0 2]);
         axis equal;
         xlabel('X');
         ylabel('Y');
@@ -281,39 +282,39 @@ end %while
 function output = controller(current)
 
     % PID Parameter Setup
-    kp = [.5 .5 1/8 0.01 0.01 .4];
-    ki = [1/8 1/8 1/32 .0001 .0001 .03];
-    kd = [.5 .5 1/8 0.01 0.01 .4];
+    kp = [.5 .5   1/8  0.01   0.01   0.4];
+    ki = [1/8 1/8 1/32 0.0001 0.0001 0.03];
+    kd = [.5 .5   1/8  0.01   0.01   0.4];
 
     % Error Calculation
     error = target - current(1,:);
-    d_error = -current(2,:);
-    int_error = int_error + error*dt;
+    d_error = -current(2,:)
+    int_error_temp = int_error + error*dt;
     
     % Adjust offset to move to target xy position
     
     offset = zeros(1,6);
-    offset(1) = cutoff(-pi/4,pi/4,kp(5)*error(5) + ki(5)*int_error(5) + kd(5)*d_error(5)); % Move in x-axis - tilt up to 45 degrees
-    offset(2) = cutoff(-pi/4,pi/4,kp(4)*error(4) + ki(4)*int_error(4) + kd(4)*d_error(4)); % Move in y-axis - tilt up to 45 degrees
+    offset(1) = cutoff(-pi/4,pi/4,kp(5)*error(5) + ki(5)*int_error_temp(5) + kd(5)*d_error(5)) % Move in x-axis - tilt up to 45 degrees
+    offset(2) = -cutoff(-pi/4,pi/4,kp(4)*error(4) + ki(4)*int_error_temp(4) + kd(4)*d_error(4)) % Move in y-axis - tilt up to 45 degrees
         
-    error = target - offset - current(1,:);
-    int_error = int_error + error*dt;
+    error = target + offset - current(1,:)
+    int_error = int_error + error*dt
     
     % PID Control
-    corrections = kp.*error + ki.*int_error + kd.*d_error;
+    corrections = kp.*error + ki.*int_error + kd.*d_error
 
     % Generate motor commands from PID corrections
 
-    nose_thrust = 0.5*corrections(1) + 0.25*corrections(3) + 0.25*corrections(6);
+    nose_thrust = cutoff(0, max_thrust, 0.5*corrections(1) + 0.25*corrections(3) + 0.25*corrections(6));
     nose_angle = 0;
 
-    tail_thrust = -0.5*corrections(1) + 0.25*corrections(3) + 0.25*corrections(6);
+    tail_thrust = cutoff(0, max_thrust, -0.5*corrections(1) + 0.25*corrections(3) + 0.25*corrections(6));
     tail_angle = 0;
     
-    left_thrust = 0.5*corrections(2) - 0.25*corrections(3) + 0.25*corrections(6);
+    left_thrust = cutoff(0, max_thrust, 0.5*corrections(2) - 0.25*corrections(3) + 0.25*corrections(6));
     left_angle = 0;
 
-    right_thrust = -0.5*corrections(2) - 0.25*corrections(3) + 0.25*corrections(6);
+    right_thrust = cutoff(0, max_thrust, -0.5*corrections(2) - 0.25*corrections(3) + 0.25*corrections(6));
     right_angle = 0;
 
     output = [
@@ -322,16 +323,6 @@ function output = controller(current)
         left_thrust left_angle;
         right_thrust right_angle
     ];
-
-    function out = cutoff(min, max, val)
-        if (val < min)
-            out = min;
-        elseif (val > max)
-             out = max;
-        else
-            out = val;            
-        end %if
-    end % cutoff
     
 end
 
@@ -346,11 +337,11 @@ function current = plant(commands, prev)
     a = prev(3,4:6);
     
     motor_thrusts = [
-    (angle2dcm(0,commands(1,2),0)*[0;0;commands(1,1)])';
-    (angle2dcm(0,-commands(2,2),0)*[0;0;commands(2,1)])';
-    (angle2dcm(-commands(3,2),0,0)*[0;0;commands(3,1)])';
-    (angle2dcm(commands(4,2),0,0)*[0;0;commands(4,1)])'
-    ];
+    (angle2dcm(0,commands(1,2),0,'XYZ')*[0;0;commands(1,1)])';
+    (angle2dcm(0,-commands(2,2),0,'XYZ')*[0;0;commands(2,1)])';
+    (angle2dcm(-commands(3,2),0,0,'XYZ')*[0;0;commands(3,1)])';
+    (angle2dcm(commands(4,2),0,0,'XYZ')*[0;0;commands(4,1)])'
+    ]
 
     motor_torques = thrust2torque(motor_thrusts);
     
@@ -369,7 +360,7 @@ function current = plant(commands, prev)
     omega = omega + alpha*dt;
     theta = theta + omega*dt;
     
-    Fnet = (angle2dcm(theta(1),theta(2),theta(3))*Fnet')';
+    Fnet = (angle2dcm(theta(1),theta(2),theta(3),'XYZ')*Fnet')';
     
     dF = Fnet - Fold;
     da = dF/quad_mass;
@@ -388,6 +379,16 @@ function current = plant(commands, prev)
         ];
 
 end
+
+function out = cutoff(min, max, val)
+    if (val < min)
+        out = min;
+    elseif (val > max)
+         out = max;
+    else
+        out = val;            
+    end %if
+end % cutoff
 
 end %SYSTEM     
 
