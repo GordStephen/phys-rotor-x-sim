@@ -398,7 +398,7 @@ function current = plant(commands, prev)
 end
 
 function target = instructions()
-    target = [0 0 0 5 5 2];
+    target = [0 0 0 2*sin(t/5) 4*cos(t/10) 6*cos(t/10+pi)+6];
 end % instructions
 
 function out = cutoff(min, max, val)
