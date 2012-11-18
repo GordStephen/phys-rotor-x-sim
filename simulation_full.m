@@ -41,13 +41,13 @@ clear;
        
     %  === Static Target Setup ======
 
-        target = [0 0 0 5 5 2]; % Define target positions (rpy xyz)
-            
-        dcm_target = angle2dcm(target(1),target(2),target(3),'XYZ'); % Calculate target position representation
-        right_target = dcm_target*[-quad_radius;0;0] + target(4:6)'; % Rotate target quadrotor points with target DCM
-        left_target = dcm_target*[quad_radius;0;0] + target(4:6)';
-        nose_target = dcm_target*[0;quad_radius;0] + target(4:6)'; 
-        tail_target = dcm_target*[0;-quad_radius;0] + target(4:6)';
+%         target = [0 0 0 5 5 2]; % Define target positions (rpy xyz)
+%             
+%         dcm_target = angle2dcm(target(1),target(2),target(3),'XYZ'); % Calculate target position representation
+%         right_target = dcm_target*[-quad_radius;0;0] + target(4:6)'; % Rotate target quadrotor points with target DCM
+%         left_target = dcm_target*[quad_radius;0;0] + target(4:6)';
+%         nose_target = dcm_target*[0;quad_radius;0] + target(4:6)'; 
+%         tail_target = dcm_target*[0;-quad_radius;0] + target(4:6)';
 
     %  === Initial Conditions Setup ======
 
@@ -76,14 +76,17 @@ clear;
         xlabel('X');
         ylabel('Y');
         zlabel('Z');
-        line([nose_target(1),tail_target(1)],[nose_target(2),tail_target(2)],[nose_target(3),tail_target(3)],'Color','blue','LineStyle',':');
-        line ([right_target(1),left_target(1)],[right_target(2),left_target(2)],[right_target(3),left_target(3)],'Color','green','LineStyle',':');
-        line([nose_target(1),tail_target(1)],[nose_target(2),tail_target(2)],[0,0],'Color','black','LineStyle',':');
-        line ([right_target(1),left_target(1)],[right_target(2),left_target(2)],[0,0],'Color','black','LineStyle',':');
+        
+        frame_nose_tail_target = line(nan,nan); set(frame_nose_tail_target,'Color','blue','LineStyle',':');
+        frame_left_right_target = line (nan,nan); set(frame_left_right_target,'Color','green','LineStyle',':');
+        shadow_nose_tail_target = line(nan,nan); set(shadow_nose_tail_target,'Color','black','LineStyle',':');
+        shadow_left_right_target = line (nan,nan); set(shadow_left_right_target,'Color','black','LineStyle',':');
+        
         frame_nose_tail_line = line(nan, nan); set(frame_nose_tail_line,'Color','blue'); 
         frame_right_left_line = line(nan, nan); set(frame_right_left_line,'Color','green');
         shadow_nose_tail_line = line(nan, nan); set(shadow_nose_tail_line,'Color','black','LineStyle','-'); 
         shadow_right_left_line = line(nan, nan); set(shadow_right_left_line,'Color','black','LineStyle','-'); 
+        
         thrust_nose_line = line(nan, nan); set(thrust_nose_line,'Color','red','LineStyle','-');
         thrust_tail_line = line(nan, nan); set(thrust_tail_line,'Color','red','LineStyle','-');
         thrust_right_line = line(nan, nan); set(thrust_right_line,'Color','red','LineStyle','-');
@@ -132,6 +135,13 @@ clear;
         z_target = line(nan, nan); set(z_target,'Color','black','LineStyle','-.');
 
         function updateplots(current)
+            
+
+            dcm_target = angle2dcm(target(1),target(2),target(3),'XYZ'); % Calculate target position representation
+            right_target = dcm_target*[-quad_radius;0;0] + target(4:6)'; % Rotate target quadrotor points with target DCM
+            left_target = dcm_target*[quad_radius;0;0] + target(4:6)';
+            nose_target = dcm_target*[0;quad_radius;0] + target(4:6)'; 
+            tail_target = dcm_target*[0;-quad_radius;0] + target(4:6)';
 
             theta = current(1,1:3);
             %theta_dot = current(2,1:3);
@@ -155,6 +165,11 @@ clear;
 
             subplot(6,2,[1 3 5 7 9 11]); % Plot 3D visualization
             title(['t=',num2str(t),'s']);
+            set(frame_nose_tail_target,'XData',[nose_target(1),tail_target(1)],'YData',[nose_target(2),tail_target(2)],'ZData',[nose_target(3),tail_target(3)]);
+            set(frame_left_right_target,'XData',[right_target(1),left_target(1)],'YData',[right_target(2),left_target(2)],'ZData',[right_target(3),left_target(3)]);
+            set(shadow_nose_tail_target,'XData',[nose_target(1),tail_target(1)],'YData',[nose_target(2),tail_target(2)],'ZData',[0,0]);
+            set(shadow_left_right_target,'XData',[right_target(1),left_target(1)],'YData',[right_target(2),left_target(2)],'ZData',[0,0]);
+
             set(frame_nose_tail_line,'XData',[nose(1),tail(1)],'YData',[nose(2),tail(2)],'ZData',[nose(3),tail(3)]);
             set(frame_right_left_line,'XData',[right(1),left(1)],'YData',[right(2),left(2)],'ZData',[right(3),left(3)]);
             set(shadow_nose_tail_line,'XData', [nose(1),tail(1)],'YData',[nose(2),tail(2)],'ZData',[0,0]);
@@ -266,6 +281,8 @@ while (ishandle(fig1))
     t = toc(t_start); 
     dt = t-t_prev;
     
+    target = instructions(); % Define target positions (rpy xyz)
+    
     commands = controller(current);
     %commands = commands + signal_noise; % signal_noise could be added here
     
@@ -282,26 +299,26 @@ end %while
 function output = controller(current)
 
     % PID Parameter Setup
-    kp = [.5 .5   1/8  0.01   0.01   0.4];
-    ki = [1/8 1/8 1/32 0.0001 0.0001 0.03];
-    kd = [.5 .5   1/8  0.01   0.01   0.4];
+    kp = [1/2    1/2     1/8     .01   .01   50];
+    ki = [1/8   1/8    1/32     .001  0.001   20];
+    kd = [1/2  1/2     1/8     .02  .02    4];
 
     % Error Calculation
     error = target - current(1,:);
-    d_error = -current(2,:)
+    d_error = -current(2,:);
     int_error_temp = int_error + error*dt;
     
     % Adjust offset to move to target xy position
     
     offset = zeros(1,6);
-    offset(1) = cutoff(-pi/4,pi/4,kp(5)*error(5) + ki(5)*int_error_temp(5) + kd(5)*d_error(5)) % Move in x-axis - tilt up to 45 degrees
-    offset(2) = -cutoff(-pi/4,pi/4,kp(4)*error(4) + ki(4)*int_error_temp(4) + kd(4)*d_error(4)) % Move in y-axis - tilt up to 45 degrees
+    offset(1) = cutoff(-pi/4,pi/4,kp(5)*error(5) + ki(5)*int_error_temp(5) + kd(5)*d_error(5)); % Move in x-axis - tilt up to 45 degrees
+    offset(2) = -cutoff(-pi/4,pi/4,kp(4)*error(4) + ki(4)*int_error_temp(4) + kd(4)*d_error(4)); % Move in y-axis - tilt up to 45 degrees
         
-    error = target + offset - current(1,:)
-    int_error = int_error + error*dt
+    error = target + offset - current(1,:);
+    int_error = int_error + error*dt;
     
     % PID Control
-    corrections = kp.*error + ki.*int_error + kd.*d_error
+    corrections = kp.*error + ki.*int_error + kd.*d_error;
 
     % Generate motor commands from PID corrections
 
@@ -341,7 +358,7 @@ function current = plant(commands, prev)
     (angle2dcm(0,-commands(2,2),0,'XYZ')*[0;0;commands(2,1)])';
     (angle2dcm(-commands(3,2),0,0,'XYZ')*[0;0;commands(3,1)])';
     (angle2dcm(commands(4,2),0,0,'XYZ')*[0;0;commands(4,1)])'
-    ]
+    ];
 
     motor_torques = thrust2torque(motor_thrusts);
     
@@ -379,6 +396,10 @@ function current = plant(commands, prev)
         ];
 
 end
+
+function target = instructions()
+    target = [0 0 0 5 5 2];
+end % instructions
 
 function out = cutoff(min, max, val)
     if (val < min)
