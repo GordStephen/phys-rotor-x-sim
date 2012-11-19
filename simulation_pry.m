@@ -1,4 +1,4 @@
- function simulation_rpy
+ function simulation_pry
 clear;
 
 % ===== Physical Properties ==========
@@ -15,9 +15,9 @@ clear;
         quad_mass = 1.3; % Mass of quadrotor [kg]
 
         quad_I = [ % Inertia tensor [kg*m^2]
-            0.025, 0, 0; 
-            0, 0.025, 0;
-            0, 0, 0.049;
+            0.0234548, 0, 0; 
+            0, 0.0241389, 0;
+            0, 0, 0.0467296;
             ];
 
         b_p = 0.5*is_drag; % Aero drag factors [N*s^2/m^2]
@@ -41,7 +41,7 @@ clear;
        
     %  === Static Target Setup ======
 
-        target = [pi/4 -pi/3 pi/6 0 0 1]; % Define target positions (rpy xyz)
+        target = [pi/6 pi/3 pi/4 0 0 1]; % Define target positions (rpy xyz)
             
         dcm_target = angle2dcm(target(1),target(2),target(3),'XYZ'); % Calculate target position representation
         right_target = dcm_target*[-quad_radius;0;0] + target(4:6)'; % Rotate target quadrotor points with target DCM
@@ -281,9 +281,10 @@ end %while
 function output = controller(current)
 
     % PID Parameter Setup
-    kp = [.5 .5 1/8 0.1 .1 20];
-    ki = [1/8 1/8 1/32 0 0 10];
-    kd = [.5 .5 1/8 0 0 15];
+    
+    kp = [.7 .7 1.4  0 0 0];
+    ki = [.4 .4 .8 0 0 0];
+    kd = [.9 .9 1.7 0 0 0];
 
     % Error Calculation
     error = target - current(1,:);
@@ -321,7 +322,7 @@ function output = controller(current)
         tail_thrust tail_angle;
         left_thrust left_angle
         right_thrust right_angle;
-    ]
+    ];
 
     function out = cutoff(min, max, val)
         if (val < min)

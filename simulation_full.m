@@ -281,7 +281,7 @@ while (ishandle(fig1))
     t = toc(t_start); 
     dt = t-t_prev;
     
-    target = instructions(); % Define target positions (rpy xyz)
+    target = instructions(current); % Define target positions (rpy xyz)
     
     commands = controller(current);
     %commands = commands + signal_noise; % signal_noise could be added here
@@ -299,9 +299,13 @@ end %while
 function output = controller(current)
 
     % PID Parameter Setup
-    kp = [1/2    1/2     1/8     .01   .01   50];
-    ki = [1/8   1/8    1/32     .001  0.001   20];
-    kd = [1/2  1/2     1/8     .02  .02    4];
+%     kp = [1/2    1/2     1/8     .05   .05   50];
+%     ki = [1/8   1/8    1/32     .03  0.03   20];
+%     kd = [1/2  1/2     1/8     .02  .02    4];
+    
+    kp = [.6 .6 1 2 2 30];
+    ki = [.3 .3 .4 0 0 10];
+    kd = [0.9 0.9 1.1 8 8 30];
 
     % Error Calculation
     error = target - current(1,:);
@@ -397,8 +401,8 @@ function current = plant(commands, prev)
 
 end
 
-function target = instructions()
-    target = [0 0 0 2*sin(t/5) 4*cos(t/10) 6*cos(t/10+pi)+6];
+function target = instructions(current)
+    target = [0 0 0 current(1,4)+(square(t/2)+1)*sin(t/2)*sin(t/10) current(1,5)+(square(t/2 + pi)+1)*sin(t/2)*cos(t/10) (7-7*exp(-2*t))+(square(t)+1)*sin(t)*cos(t/10)];
 end % instructions
 
 function out = cutoff(min, max, val)
